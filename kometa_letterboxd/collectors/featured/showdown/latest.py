@@ -20,10 +20,12 @@ from .probe import (
     ShowdownSummary,
     _populate_tmdb_ids as populate_showdown_tmdb_ids,
     fetch_html,
+    parse_showdown_background_image,
     parse_showdown_crew_list,
     parse_showdown_description,
     parse_showdown_index,
 )
+from .poster import generate_showdown_poster
 
 
 def generate_latest_showdown_collections(
@@ -56,6 +58,16 @@ def generate_latest_showdown_collections(
             return {}, resolve_path(showdown_config.kometa_destination, base_path)
 
         collections: dict[str, MutableMapping[str, Any]] = {}
+        wants_generated_poster = not has_explicit_poster_setting(showdown_config)
+        wants_generated_background = (
+            showdown_config.poster is not None
+            and showdown_config.poster.background
+            and not has_explicit_background_setting(showdown_config)
+        )
+        generate_artwork = (
+            showdown_config.poster is not None
+            and (wants_generated_poster or wants_generated_background)
+        )
         for index, summary in enumerate(selected, start=1):
             progress(f"- Processing completed Showdown '{summary.title}'")
             dataset = fetch_latest_showdown_dataset(
@@ -72,12 +84,32 @@ def generate_latest_showdown_collections(
                 collection_name=collection_name,
                 progress=progress,
             )
+            file_poster = None
+            file_background = None
+            if generate_artwork and showdown_config.poster is not None:
+                generated_poster = generate_showdown_poster(
+                    dataset,
+                    showdown_config.poster,
+                    base_path=base_path,
+                    session=ses,
+                    timeout=timeout,
+                    render_poster=wants_generated_poster,
+                    save_background=wants_generated_background,
+                    progress=progress,
+                )
+                if generated_poster is not None:
+                    if wants_generated_poster:
+                        file_poster = generated_poster.kometa_path
+                    if wants_generated_background:
+                        file_background = generated_poster.background_kometa_path
             collections[collection_name] = build_latest_showdown_collection(
                 dataset,
                 showdown_config,
                 collection_name=collection_name,
                 index=index,
                 collection_order=collection_order,
+                file_poster=file_poster,
+                file_background=file_background,
             )
 
         destination = resolve_path(showdown_config.kometa_destination, base_path)
@@ -109,6 +141,7 @@ def fetch_latest_showdown_dataset(
     progress: Callable[[str], None] | None = None,
 ) -> ShowdownDataset:
     description = None
+    background_image = summary.background_image
     try:
         showdown_html = fetch_html(
             summary.showdown_url,
@@ -116,6 +149,9 @@ def fetch_latest_showdown_dataset(
             timeout=timeout,
         )
         description = parse_showdown_description(showdown_html)
+        background_image = (
+            parse_showdown_background_image(showdown_html) or background_image
+        )
     except requests.RequestException as exc:
         if progress:
             progress(
@@ -137,7 +173,7 @@ def fetch_latest_showdown_dataset(
             showdown_url=summary.showdown_url,
             crew_list_url=summary.crew_list_url,
             description=description,
-            background_image=summary.background_image,
+            background_image=background_image,
         ),
         published_at=published_at,
         entries=top_entries,
@@ -174,8 +210,10 @@ def build_latest_showdown_collection(
     collection_name: str,
     index: int,
     collection_order: str | None,
+    file_poster: str | None = None,
+    file_background: str | None = None,
 ) -> MutableMapping[str, Any]:
-    return build_collection_entry(
+    collection = build_collection_entry(
         dataset.summary.showdown_url,
         sort_title=f"Showdown Latest {index:02d} {collection_name}",
         sync_mode=showdown_config.sync_mode,
@@ -184,6 +222,19 @@ def build_latest_showdown_collection(
         extra=showdown_config.kometa_extra(),
         tmdb_ids=_tmdb_ids(dataset.entries),
     )
+    if (
+        file_poster
+        and "file_poster" not in collection
+        and "url_poster" not in collection
+    ):
+        collection["file_poster"] = file_poster
+    if (
+        file_background
+        and "file_background" not in collection
+        and "url_background" not in collection
+    ):
+        collection["file_background"] = file_background
+    return collection
 
 
 def build_showdown_collection_summary(dataset: ShowdownDataset) -> str:
@@ -218,6 +269,16 @@ def resolve_collection_order(
             "Kometa treats multiple direct TMDb movie IDs as multiple builders."
         )
     return None
+
+
+def has_explicit_poster_setting(showdown_config: ShowdownLatestConfig) -> bool:
+    extra = showdown_config.kometa_extra()
+    return any(key in extra for key in ("file_poster", "url_poster"))
+
+
+def has_explicit_background_setting(showdown_config: ShowdownLatestConfig) -> bool:
+    extra = showdown_config.kometa_extra()
+    return any(key in extra for key in ("file_background", "url_background"))
 
 
 def _tmdb_ids(entries: Iterable[ShowdownEntry]) -> list[str]:

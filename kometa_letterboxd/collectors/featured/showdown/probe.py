@@ -177,15 +177,56 @@ def _normalize_description_text(text: str) -> str:
 
 def parse_showdown_background_image(html: str) -> str | None:
     """Extract the background image URL from a showdown page."""
-    # Look for images with the characteristic background dimensions
-    pattern = r'https://[^"\']+?-1200-1200-675-675-crop-fill\.jpg'
-    matches = re.findall(pattern, html, re.IGNORECASE)
+    soup = BeautifulSoup(html, "html.parser")
 
-    if matches:
-        # Return the first match, they should all be the same image
-        return matches[0]
+    backdrop = soup.select_one("#backdrop")
+    if backdrop:
+        for attr in ("data-backdrop2x", "data-backdrop", "data-backdrop-mobile"):
+            value = backdrop.get(attr)
+            if isinstance(value, str) and _is_letterboxd_still_image(value):
+                return value.strip()
+
+    for attrs in (
+        {"property": "og:image"},
+        {"name": "twitter:image"},
+    ):
+        meta = soup.find("meta", attrs=attrs)
+        if meta:
+            content = meta.get("content")
+            if isinstance(content, str) and _is_letterboxd_still_image(content):
+                return content.strip()
+
+    pattern = r'https://[^"\']+?\.(?:jpe?g|png|webp)(?:\?[^"\']*)?'
+    matches = re.findall(pattern, html.replace("&amp;", "&"), re.IGNORECASE)
+    candidates = [url for url in matches if _is_letterboxd_still_image(url)]
+    if candidates:
+        return sorted(candidates, key=_still_image_sort_key)[0]
 
     return None
+
+
+def _is_letterboxd_still_image(url: str) -> bool:
+    normalized = url.strip().lower()
+    if "a.ltrbxd.com" not in normalized:
+        return False
+    if not any(ext in normalized for ext in (".jpg", ".jpeg", ".png", ".webp")):
+        return False
+    if "/avatar/" in normalized:
+        return False
+    return "/sm/upload/" in normalized
+
+
+def _still_image_sort_key(url: str) -> tuple[int, str]:
+    normalized = url.lower()
+    if "1920-1920-1080-1080" in normalized:
+        return (0, url)
+    if "-1200-1200-675-675-" in normalized:
+        return (1, url)
+    if "/sm/upload/" in normalized and "/resized/" not in normalized:
+        return (2, url)
+    if "-960-960-540-540-" in normalized:
+        return (3, url)
+    return (4, url)
 
 
 def parse_showdown_index(html: str) -> list[ShowdownSummary]:

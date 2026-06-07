@@ -7,16 +7,21 @@ from unittest.mock import patch
 
 from kometa_letterboxd.collectors.featured.showdown.latest import (
     build_latest_showdown_collection,
+    fetch_latest_showdown_dataset,
     format_showdown_collection_name,
     generate_latest_showdown_collections,
+    has_explicit_background_setting,
+    has_explicit_poster_setting,
     select_latest_completed_showdowns,
     select_top_showdown_entries,
 )
+from kometa_letterboxd.collectors.featured.showdown.poster import GeneratedPoster
 from kometa_letterboxd.collectors.featured.showdown.probe import (
     CREW_LIST_TEMPLATE,
     ShowdownDataset,
     ShowdownEntry,
     ShowdownSummary,
+    parse_showdown_background_image,
     parse_showdown_description,
 )
 from kometa_letterboxd.common.config import ShowdownLatestConfig, load_config
@@ -162,6 +167,72 @@ class ShowdownLatestCollectionTests(unittest.TestCase):
         self.assertIn("A description from Letterboxd.", collection["summary"])
         self.assertIn(summary.showdown_url, collection["summary"])
 
+    def test_collection_includes_generated_file_poster(self) -> None:
+        config = ShowdownLatestConfig.model_validate({})
+        summary = _summary(
+            "short-n-sweet",
+            "Short 'n' Sweet",
+            "Best adaptation of short to feature",
+        )
+        dataset = ShowdownDataset(
+            summary=summary,
+            published_at="2026-06-01T00:00:00Z",
+            entries=[_entry(1, "one", "100")],
+        )
+
+        collection = build_latest_showdown_collection(
+            dataset,
+            config,
+            collection_name=format_showdown_collection_name(summary),
+            index=1,
+            collection_order=None,
+            file_poster="/config/assets/showdowns/short-n-sweet.jpg",
+            file_background="/config/assets/showdowns/short-n-sweet-background.jpg",
+        )
+
+        self.assertEqual(
+            collection["file_poster"],
+            "/config/assets/showdowns/short-n-sweet.jpg",
+        )
+        self.assertEqual(
+            collection["file_background"],
+            "/config/assets/showdowns/short-n-sweet-background.jpg",
+        )
+
+    def test_explicit_poster_fields_are_not_replaced(self) -> None:
+        config = ShowdownLatestConfig.model_validate(
+            {
+                "url_poster": "https://example.com/poster.jpg",
+                "url_background": "https://example.com/background.jpg",
+            }
+        )
+        summary = _summary("short-n-sweet", "Short 'n' Sweet", None)
+        dataset = ShowdownDataset(
+            summary=summary,
+            published_at="2026-06-01T00:00:00Z",
+            entries=[_entry(1, "one", "100")],
+        )
+
+        collection = build_latest_showdown_collection(
+            dataset,
+            config,
+            collection_name=format_showdown_collection_name(summary),
+            index=1,
+            collection_order=None,
+            file_poster="/config/assets/showdowns/generated.jpg",
+            file_background="/config/assets/showdowns/generated-background.jpg",
+        )
+
+        self.assertEqual(collection["url_poster"], "https://example.com/poster.jpg")
+        self.assertEqual(
+            collection["url_background"],
+            "https://example.com/background.jpg",
+        )
+        self.assertNotIn("file_poster", collection)
+        self.assertNotIn("file_background", collection)
+        self.assertTrue(has_explicit_poster_setting(config))
+        self.assertTrue(has_explicit_background_setting(config))
+
     def test_radarr_search_can_be_disabled(self) -> None:
         config = ShowdownLatestConfig.model_validate(
             {"radarr_add_missing": True, "radarr_search": False}
@@ -238,6 +309,143 @@ class ShowdownLatestCollectionTests(unittest.TestCase):
             True,
         )
 
+    def test_generate_uses_showdown_image_for_generated_poster(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = ShowdownLatestConfig.model_validate(
+                {
+                    "count": 1,
+                    "entries": 1,
+                    "kometa_destination": "/tmp/showdowns.yml",
+                    "poster": {
+                        "output_directory": directory,
+                        "kometa_path": "/config/assets/showdowns",
+                    },
+                }
+            )
+
+            def fake_fetch(url, **_kwargs):
+                if url == "https://letterboxd.com/showdown/":
+                    return INDEX_HTML
+                if url.endswith("/showdown/short-n-sweet/"):
+                    return DESCRIPTION_WITH_BACKGROUND_HTML
+                if url.endswith("/crew/list/showdown-short-n-sweet/"):
+                    return crew_html("short")
+                raise AssertionError(f"Unexpected URL: {url}")
+
+            def populate_tmdb_ids(datasets, **_kwargs) -> None:
+                for dataset in datasets:
+                    for entry in dataset.entries:
+                        entry.tmdb_id = f"{dataset.summary.slug}-{entry.rank}"
+
+            seen_background_urls = []
+
+            def generate_poster(dataset, *_args, **_kwargs):
+                seen_background_urls.append(dataset.summary.background_image)
+                return GeneratedPoster(
+                    Path(directory) / "short-n-sweet.jpg",
+                    "/config/assets/showdowns/short-n-sweet.jpg",
+                    Path(directory) / "short-n-sweet-background.jpg",
+                    "/config/assets/showdowns/short-n-sweet-background.jpg",
+                )
+
+            with (
+                patch(
+                    "kometa_letterboxd.collectors.featured.showdown.latest.fetch_html",
+                    side_effect=fake_fetch,
+                ),
+                patch(
+                    "kometa_letterboxd.collectors.featured.showdown.latest."
+                    "populate_showdown_tmdb_ids",
+                    side_effect=populate_tmdb_ids,
+                ),
+                patch(
+                    "kometa_letterboxd.collectors.featured.showdown.latest."
+                    "generate_showdown_poster",
+                    side_effect=generate_poster,
+                ),
+            ):
+                collections, _destination = generate_latest_showdown_collections(
+                    config,
+                    base_path=Path("/base"),
+                    progress=lambda _message: None,
+                )
+
+        self.assertEqual(seen_background_urls, [SHOWDOWN_BACKGROUND_URL])
+        self.assertEqual(
+            collections[
+                "Short 'n' Sweet: Best adaptation of short to feature"
+            ]["file_poster"],
+            "/config/assets/showdowns/short-n-sweet.jpg",
+        )
+        self.assertEqual(
+            collections[
+                "Short 'n' Sweet: Best adaptation of short to feature"
+            ]["file_background"],
+            "/config/assets/showdowns/short-n-sweet-background.jpg",
+        )
+
+
+class ShowdownLatestScraperTests(unittest.TestCase):
+    def test_showdown_background_image_is_parsed(self) -> None:
+        self.assertEqual(
+            parse_showdown_background_image(DESCRIPTION_WITH_BACKGROUND_HTML),
+            SHOWDOWN_BACKGROUND_URL,
+        )
+
+    def test_showdown_background_image_uses_backdrop_attribute(self) -> None:
+        html = f"""
+<div id="backdrop" data-backdrop="{SHORT_BACKDROP_URL}"
+     data-backdrop2x="{SHORT_BACKDROP_2X_URL}"></div>
+"""
+
+        self.assertEqual(
+            parse_showdown_background_image(html),
+            SHORT_BACKDROP_2X_URL,
+        )
+
+    def test_showdown_background_image_uses_opengraph_fallback(self) -> None:
+        html = f"""
+<meta property="og:image" content="{SHORT_BACKDROP_URL}">
+"""
+
+        self.assertEqual(
+            parse_showdown_background_image(html),
+            SHORT_BACKDROP_URL,
+        )
+
+    def test_latest_dataset_stores_background_image(self) -> None:
+        summary = _summary(
+            "short-n-sweet",
+            "Short 'n' Sweet",
+            "Best adaptation of short to feature",
+        )
+
+        def fake_fetch(url, **_kwargs):
+            if url.endswith("/showdown/short-n-sweet/"):
+                return DESCRIPTION_WITH_BACKGROUND_HTML
+            if url.endswith("/crew/list/showdown-short-n-sweet/"):
+                return crew_html("short")
+            raise AssertionError(f"Unexpected URL: {url}")
+
+        with (
+            patch(
+                "kometa_letterboxd.collectors.featured.showdown.latest.fetch_html",
+                side_effect=fake_fetch,
+            ),
+            patch(
+                "kometa_letterboxd.collectors.featured.showdown.latest."
+                "populate_showdown_tmdb_ids",
+            ),
+        ):
+            dataset = fetch_latest_showdown_dataset(
+                summary,
+                entries=1,
+                timeout=30,
+                session=object(),
+            )
+
+        self.assertEqual(dataset.summary.background_image, SHOWDOWN_BACKGROUND_URL)
+
 
 class ShowdownLatestConfigTests(unittest.TestCase):
     def test_existing_showdown_config_still_loads_without_latest(self) -> None:
@@ -279,6 +487,37 @@ showdown_latest:
             "/path/to/showdown-latest.yml",
         )
 
+    def test_showdown_latest_poster_config_loads(self) -> None:
+        payload = """
+showdown_latest:
+  count: 2
+  entries: 5
+  kometa_destination: /path/to/showdown-latest.yml
+  poster:
+    output_directory: ./assets/showdown-latest
+    kometa_path: /config/assets/showdown-latest
+    logo_path: ./assets/letterboxd-logo.png
+    logo_label: SHOWDOWN
+    background: true
+    width: 800
+    height: 1200
+    format: png
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yml"
+            path.write_text(payload, encoding="utf-8")
+            config = load_config(path)
+
+        self.assertIsNotNone(config.showdown_latest)
+        self.assertIsNotNone(config.showdown_latest.poster)
+        self.assertEqual(
+            config.showdown_latest.poster.output_directory,
+            "./assets/showdown-latest",
+        )
+        self.assertEqual(config.showdown_latest.poster.logo_label, "SHOWDOWN")
+        self.assertEqual(config.showdown_latest.poster.background, True)
+        self.assertEqual(config.showdown_latest.poster.image_format, "png")
+
 
 INDEX_HTML = """
 <section class="content-teaser">
@@ -306,6 +545,26 @@ INDEX_HTML = """
 
 DESCRIPTION_HTML = """
 <div class="body-text -prose">Official Letterboxd Showdown description.</div>
+"""
+
+SHOWDOWN_BACKGROUND_URL = (
+    "https://a.ltrbxd.com/resized/sm/upload/example"
+    "-1200-1200-675-675-crop-fill.jpg"
+)
+
+SHORT_BACKDROP_URL = (
+    "https://a.ltrbxd.com/resized/sm/upload/11/iu/xs/ry/"
+    "short-term-12-1200-1200-675-675-crop-000000.jpg?v=e3f08c6089"
+)
+
+SHORT_BACKDROP_2X_URL = (
+    "https://a.ltrbxd.com/resized/sm/upload/11/iu/xs/ry/"
+    "short-term-12-1920-1920-1080-1080-crop-000000.jpg?v=e3f08c6089"
+)
+
+DESCRIPTION_WITH_BACKGROUND_HTML = f"""
+<div class="body-text -prose">Official Letterboxd Showdown description.</div>
+<script>window.image = "{SHOWDOWN_BACKGROUND_URL}";</script>
 """
 
 

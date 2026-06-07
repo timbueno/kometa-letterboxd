@@ -53,6 +53,17 @@ showdown_latest:
   visible_library: true
   visible_home: true
   visible_shared: false
+  # Optional generated collection posters. Install with:
+  # .venv/bin/python -m pip install -e ".[posters]"
+  # poster:
+  #   output_directory: "./assets/showdown-latest"
+  #   kometa_path: "/config/assets/showdown-latest"
+  #   logo_path: "./assets/letterboxd-logo.png"
+  #   logo_label: "SHOWDOWN"
+  #   background: true
+  #   width: 1000
+  #   height: 1500
+  #   format: jpg
 
 showdown:
   showdown_json: path/to/showdown.json

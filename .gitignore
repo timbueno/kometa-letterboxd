@@ -1,6 +1,8 @@
 # user data
+.DS_Store
 config.y*ml
 data/
+assets/showdown-latest/
 
 # python matter
 .venv/

@@ -21,6 +21,11 @@ dependencies = [
   "pydantic>=2.0",
 ]
 
+[project.optional-dependencies]
+posters = [
+  "Pillow>=10.0",
+]
+
 [project.urls]
 Repository = "https://github.com/brege/kometa-letterboxd"
 

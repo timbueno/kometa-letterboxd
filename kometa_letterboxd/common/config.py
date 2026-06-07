@@ -58,6 +58,23 @@ class ShowdownConfig(BaseModel):
     kometa_destination: NonEmptyStr | None = None
 
 
+class ShowdownPosterConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    output_directory: NonEmptyStr
+    kometa_path: NonEmptyStr | None = None
+    logo_path: NonEmptyStr | None = None
+    logo_label: str | None = "SHOWDOWN"
+    background: bool = True
+    width: int = Field(default=1000, ge=300)
+    height: int = Field(default=1500, ge=450)
+    image_format: Literal["jpg", "jpeg", "png"] = Field(
+        default="jpg",
+        validation_alias=AliasChoices("image_format", "format"),
+    )
+    quality: int = Field(default=92, ge=1, le=100)
+
+
 class ShowdownLatestConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -71,6 +88,7 @@ class ShowdownLatestConfig(BaseModel):
     radarr_tag: NonEmptyStr | list[NonEmptyStr] | None = None
     radarr_search: bool | None = None
     kometa_destination: NonEmptyStr | None = None
+    poster: ShowdownPosterConfig | None = None
     extra: dict[str, object] = Field(default_factory=dict)
 
     def kometa_extra(self) -> dict[str, object]:

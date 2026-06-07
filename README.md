@@ -14,6 +14,13 @@ python3.12 -m venv .venv
 python -m pip install -e .
 ```
 
+If you want generated Showdown posters, install the optional poster extra in the
+same virtual environment:
+
+```bash
+python -m pip install -e ".[posters]"
+```
+
 ## Usage
 
 ```bash
@@ -99,9 +106,30 @@ showdown_latest:
   visible_library: true
   visible_home: true
   visible_shared: false
+  poster:
+    output_directory: "./assets/showdown-latest"
+    kometa_path: "/config/assets/showdown-latest"
+    logo_path: "./assets/letterboxd-logo.png"
+    logo_label: "SHOWDOWN"
+    background: true
 ```
 
 Each collection uses the Showdown title plus logline, for example `Short 'n' Sweet: Best adaptation of short to feature`, includes the Showdown description as the Plex collection summary, and emits direct `tmdb_movie` IDs for the top `entries` movies.
+
+The optional `poster` block generates a poster image for each latest Showdown
+collection and emits `file_poster` in the Kometa YAML. By default it also saves
+the source Letterboxd still without darkening or resizing and emits
+`file_background`. Set `background: false` if you only want posters.
+`output_directory` is where this script writes the images. `kometa_path` is the
+path Kometa should use to read the same directory, which is useful when Kometa
+runs in Docker. If the script and Kometa see the same filesystem path, omit
+`kometa_path`.
+
+The repository includes a Letterboxd logo PNG at `assets/letterboxd-logo.png`.
+The renderer appends `logo_label`, which defaults to `SHOWDOWN`, beside or
+below that logo. If `logo_path` is omitted, the generated poster uses a text
+masthead. Install poster support with
+`.venv/bin/python -m pip install -e ".[posters]"`.
 
 ### Showdowns in Plex
 
