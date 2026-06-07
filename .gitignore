@@ -3,6 +3,9 @@
 config.y*ml
 data/
 assets/showdown-latest/
+logs/
+.kometa-letterboxd.lock
+.kometa-letterboxd.lock.d/
 
 # python matter
 .venv/
