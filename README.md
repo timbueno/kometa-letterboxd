@@ -59,6 +59,7 @@ random:
       seed: "tnmn"
       period: "monthly"
       sync_mode: "sync"
+      show_missing: true
       radarr_add_missing: true
       radarr_folder: "/media/ephemeral-movies"
       radarr_tag:
@@ -71,6 +72,8 @@ The selector resolves movies from the complete source list, deduplicates them by
 Random collections are emitted with direct `tmdb_movie` IDs when Letterboxd exposes the TMDb ID on each selected film page. The script fetches the complete list pages to build the pool, samples by stable Letterboxd movie identifiers, and then resolves TMDb IDs only for the selected subset. If `count` is larger than the source list size, the collection uses all resolved movies.
 
 Random collections omit `collection_order` by default. Kometa allows `collection_order: custom` only with a single builder, and direct `tmdb_movie` entries can be treated as multiple builders when several IDs are provided. You can still set non-custom order values such as `release.desc`.
+
+Random collections emit `show_missing: true` by default so Kometa logs which selected titles are not yet in Plex. Set `show_missing: false` on a collection if you want quieter logs.
 
 ### Showdowns in Plex
 

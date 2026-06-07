@@ -68,6 +68,7 @@ class RandomCollectionConfig(BaseModel):
     period: Literal["monthly"] = "monthly"
     sync_mode: str = "sync"
     collection_order: str | None = None
+    show_missing: bool | None = True
     radarr_add_missing: bool | None = None
     radarr_folder: NonEmptyStr | None = None
     radarr_tag: NonEmptyStr | list[NonEmptyStr] | None = None
@@ -78,6 +79,7 @@ class RandomCollectionConfig(BaseModel):
             "radarr_add_missing": self.radarr_add_missing,
             "radarr_folder": self.radarr_folder,
             "radarr_tag": self.radarr_tag,
+            "show_missing": self.show_missing,
         }
         payload = {
             key: value for key, value in direct_fields.items() if value is not None
