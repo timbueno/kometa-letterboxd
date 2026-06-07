@@ -31,7 +31,6 @@ random:
       seed: "tnmn"
       period: "monthly"
       sync_mode: "sync"
-      collection_order: "custom"
       radarr_add_missing: true
       radarr_folder: "/media/ephemeral-movies"
       radarr_tag:

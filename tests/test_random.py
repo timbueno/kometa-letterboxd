@@ -143,10 +143,73 @@ class RandomSelectionTests(unittest.TestCase):
         self.assertNotIn("letterboxd_list", entry)
         self.assertEqual(len(entry["tmdb_movie"]), 3)
         self.assertEqual(entry["sync_mode"], "sync")
-        self.assertEqual(entry["collection_order"], "custom")
+        self.assertNotIn("collection_order", entry)
         self.assertEqual(entry["radarr_add_missing"], True)
         self.assertEqual(entry["radarr_folder"], "/media/ephemeral-movies")
         self.assertEqual(entry["radarr_tag"], ["ephemeral", "tnmn-random"])
+
+    def test_random_collection_keeps_non_custom_collection_order(self) -> None:
+        config = RandomConfig.model_validate(
+            {
+                "collections": [
+                    {
+                        "name": "Random from TNMN",
+                        "url": "https://letterboxd.com/example/list/source/",
+                        "count": 3,
+                        "seed": "tnmn",
+                        "collection_order": "release.desc",
+                    }
+                ]
+            }
+        )
+
+        with patch(
+            "kometa_letterboxd.collectors.user.random.fetch_letterboxd_list_movies",
+            return_value=_movies(*range(1, 11)),
+        ):
+            collections = generate_random_collections(
+                config,
+                current_date=datetime.date(2026, 6, 7),
+                progress=lambda _message: None,
+            )
+
+        self.assertEqual(
+            collections["Random from TNMN"]["collection_order"],
+            "release.desc",
+        )
+
+    def test_random_collection_omits_custom_order_for_multiple_tmdb_movies(
+        self,
+    ) -> None:
+        config = RandomConfig.model_validate(
+            {
+                "collections": [
+                    {
+                        "name": "Random from TNMN",
+                        "url": "https://letterboxd.com/example/list/source/",
+                        "count": 3,
+                        "seed": "tnmn",
+                        "collection_order": "custom",
+                    }
+                ]
+            }
+        )
+        messages: list[str] = []
+
+        with patch(
+            "kometa_letterboxd.collectors.user.random.fetch_letterboxd_list_movies",
+            return_value=_movies(*range(1, 11)),
+        ):
+            collections = generate_random_collections(
+                config,
+                current_date=datetime.date(2026, 6, 7),
+                progress=messages.append,
+            )
+
+        self.assertNotIn("collection_order", collections["Random from TNMN"])
+        self.assertTrue(
+            any("Omitting collection_order: custom" in message for message in messages)
+        )
 
     def test_random_collection_resolves_tmdb_ids_only_after_sampling(self) -> None:
         config = RandomConfig.model_validate(

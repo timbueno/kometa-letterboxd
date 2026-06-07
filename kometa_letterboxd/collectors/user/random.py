@@ -113,11 +113,18 @@ def generate_random_collections(
             f"from {collection_config.url}"
         )
 
+        collection_order = _resolve_collection_order(
+            collection_config.collection_order,
+            builder_item_count=len(tmdb_ids),
+            collection_name=collection_config.name,
+            progress=progress,
+        )
+
         collections[collection_config.name] = build_collection_entry(
             collection_config.url,
             sort_title=collection_config.name,
             sync_mode=collection_config.sync_mode,
-            collection_order=collection_config.collection_order,
+            collection_order=collection_order,
             extra=collection_config.kometa_extra(),
             tmdb_ids=tmdb_ids,
         )
@@ -221,6 +228,27 @@ def _first_attribute(element, *names: str) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return ""
+
+
+def _resolve_collection_order(
+    collection_order: str | None,
+    *,
+    builder_item_count: int,
+    collection_name: str,
+    progress: Callable[[str], None] | None = None,
+) -> str | None:
+    if collection_order != "custom":
+        return collection_order
+
+    if builder_item_count <= 1:
+        return collection_order
+
+    if progress:
+        progress(
+            f"- Omitting collection_order: custom for '{collection_name}' because "
+            "Kometa treats multiple direct TMDb movie IDs as multiple builders."
+        )
+    return None
 
 
 def _populate_tmdb_ids(

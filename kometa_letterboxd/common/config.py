@@ -67,7 +67,7 @@ class RandomCollectionConfig(BaseModel):
     seed: NonEmptyStr
     period: Literal["monthly"] = "monthly"
     sync_mode: str = "sync"
-    collection_order: str | None = "custom"
+    collection_order: str | None = None
     radarr_add_missing: bool | None = None
     radarr_folder: NonEmptyStr | None = None
     radarr_tag: NonEmptyStr | list[NonEmptyStr] | None = None
