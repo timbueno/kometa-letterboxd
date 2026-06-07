@@ -72,6 +72,7 @@ class RandomCollectionConfig(BaseModel):
     radarr_add_missing: bool | None = None
     radarr_folder: NonEmptyStr | None = None
     radarr_tag: NonEmptyStr | list[NonEmptyStr] | None = None
+    radarr_search: bool | None = None
     extra: dict[str, object] = Field(default_factory=dict)
 
     def kometa_extra(self) -> dict[str, object]:
@@ -79,8 +80,11 @@ class RandomCollectionConfig(BaseModel):
             "radarr_add_missing": self.radarr_add_missing,
             "radarr_folder": self.radarr_folder,
             "radarr_tag": self.radarr_tag,
+            "radarr_search": self.radarr_search,
             "show_missing": self.show_missing,
         }
+        if self.radarr_add_missing is True and self.radarr_search is None:
+            direct_fields["radarr_search"] = True
         payload = {
             key: value for key, value in direct_fields.items() if value is not None
         }

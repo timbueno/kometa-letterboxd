@@ -33,6 +33,7 @@ random:
       sync_mode: "sync"
       show_missing: true
       radarr_add_missing: true
+      radarr_search: true
       radarr_folder: "/media/ephemeral-movies"
       radarr_tag:
         - "ephemeral"

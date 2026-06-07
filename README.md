@@ -61,6 +61,7 @@ random:
       sync_mode: "sync"
       show_missing: true
       radarr_add_missing: true
+      radarr_search: true
       radarr_folder: "/media/ephemeral-movies"
       radarr_tag:
         - "ephemeral"
@@ -74,6 +75,8 @@ Random collections are emitted with direct `tmdb_movie` IDs when Letterboxd expo
 Random collections omit `collection_order` by default. Kometa allows `collection_order: custom` only with a single builder, and direct `tmdb_movie` entries can be treated as multiple builders when several IDs are provided. You can still set non-custom order values such as `release.desc`.
 
 Random collections emit `show_missing: true` by default so Kometa logs which selected titles are not yet in Plex. Set `show_missing: false` on a collection if you want quieter logs.
+
+When `radarr_add_missing: true` is set, Random collections also emit `radarr_search: true` by default so Radarr starts a search after Kometa adds missing movies. Set `radarr_search: false` if you only want Radarr to add and monitor them.
 
 ### Showdowns in Plex
 

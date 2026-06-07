@@ -146,8 +146,37 @@ class RandomSelectionTests(unittest.TestCase):
         self.assertNotIn("collection_order", entry)
         self.assertEqual(entry["show_missing"], True)
         self.assertEqual(entry["radarr_add_missing"], True)
+        self.assertEqual(entry["radarr_search"], True)
         self.assertEqual(entry["radarr_folder"], "/media/ephemeral-movies")
         self.assertEqual(entry["radarr_tag"], ["ephemeral", "tnmn-random"])
+
+    def test_random_collection_can_disable_radarr_search(self) -> None:
+        config = RandomConfig.model_validate(
+            {
+                "collections": [
+                    {
+                        "name": "Random from TNMN",
+                        "url": "https://letterboxd.com/example/list/source/",
+                        "count": 3,
+                        "seed": "tnmn",
+                        "radarr_add_missing": True,
+                        "radarr_search": False,
+                    }
+                ]
+            }
+        )
+
+        with patch(
+            "kometa_letterboxd.collectors.user.random.fetch_letterboxd_list_movies",
+            return_value=_movies(*range(1, 11)),
+        ):
+            collections = generate_random_collections(
+                config,
+                current_date=datetime.date(2026, 6, 7),
+                progress=lambda _message: None,
+            )
+
+        self.assertEqual(collections["Random from TNMN"]["radarr_search"], False)
 
     def test_random_collection_can_disable_show_missing(self) -> None:
         config = RandomConfig.model_validate(
