@@ -29,6 +29,9 @@ python -m pip install -e ".[posters]"
 
 See `config.example.yml` for configuration options.
 
+For a full server setup, scheduling, update, and troubleshooting walkthrough,
+see [Setup and Operations](docs/setup-and-operations.md).
+
 Run tests from the same virtual environment:
 
 ```bash
