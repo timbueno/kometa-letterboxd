@@ -44,8 +44,10 @@ def build_collection_entry(
     if collection_order is not None:
         entry["collection_order"] = collection_order
 
-    # Use tmdb_movie if TMDB IDs are provided, otherwise use letterboxd_list
-    if tmdb_ids:
+    # Use tmdb_movie if TMDB IDs are provided, otherwise use letterboxd_list.
+    # An explicitly empty TMDB list should stay empty rather than falling back
+    # to a full source list.
+    if tmdb_ids is not None:
         entry["tmdb_movie"] = list(tmdb_ids)
     else:
         entry["letterboxd_list"] = _normalize_letterboxd_source(source)

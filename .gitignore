@@ -3,5 +3,6 @@ config.y*ml
 data/
 
 # python matter
+.venv/
 __pycache__
 *.pyc

@@ -5,6 +5,9 @@ request_timeout: 30
 lists_cache: data/user/dated.json
 refresh_lists: false
 
+kometa:
+  config_path: /path/to/kometa/config.yml
+
 dated:
   kometa_target: /path/to/kometa/config.yml
   letterboxd_prefix: "Movie Night - "
@@ -19,6 +22,21 @@ tagged:
   tag: plex
   extra:
     label.not: "Film Club"
+
+random:
+  collections:
+    - name: "🌊 Random from TNMN"
+      url: "https://letterboxd.com/tn_movienight/list/tuesday-night-movie-night-recommendations/"
+      count: 10
+      seed: "tnmn"
+      period: "monthly"
+      sync_mode: "sync"
+      collection_order: "custom"
+      radarr_add_missing: true
+      radarr_folder: "/media/ephemeral-movies"
+      radarr_tag:
+        - "ephemeral"
+        - "tnmn-random"
 
 showdown:
   showdown_json: path/to/showdown.json

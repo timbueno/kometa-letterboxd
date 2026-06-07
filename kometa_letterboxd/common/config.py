@@ -58,22 +58,76 @@ class ShowdownConfig(BaseModel):
     kometa_destination: NonEmptyStr | None = None
 
 
+class RandomCollectionConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: NonEmptyStr
+    url: NonEmptyStr
+    count: int = Field(ge=0)
+    seed: NonEmptyStr
+    period: Literal["monthly"] = "monthly"
+    sync_mode: str = "sync"
+    collection_order: str | None = "custom"
+    radarr_add_missing: bool | None = None
+    radarr_folder: NonEmptyStr | None = None
+    radarr_tag: NonEmptyStr | list[NonEmptyStr] | None = None
+    extra: dict[str, object] = Field(default_factory=dict)
+
+    def kometa_extra(self) -> dict[str, object]:
+        direct_fields = {
+            "radarr_add_missing": self.radarr_add_missing,
+            "radarr_folder": self.radarr_folder,
+            "radarr_tag": self.radarr_tag,
+        }
+        payload = {
+            key: value for key, value in direct_fields.items() if value is not None
+        }
+        payload.update(self.extra)
+
+        if self.model_extra:
+            for key, value in self.model_extra.items():
+                if value is not None:
+                    payload[key] = value
+
+        return payload
+
+
+class RandomConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    collections: list[RandomCollectionConfig] = Field(default_factory=list)
+    kometa_destination: NonEmptyStr | None = None
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    username: NonEmptyStr
+    username: NonEmptyStr | None = None
     request_timeout: int = Field(default=30, ge=1)
     lists_cache: NonEmptyStr | None = None
     refresh_lists: bool = False
     kometa: KometaConfig = Field(default_factory=KometaConfig)
-    dated: DatedConfig
+    dated: DatedConfig | None = None
     tagged: TaggedConfig = Field(default_factory=TaggedConfig)
     showdown: ShowdownConfig | None = None
+    random: RandomConfig = Field(default_factory=RandomConfig)
 
     @model_validator(mode="after")
-    def validate_showdown_config(self) -> AppConfig:
+    def validate_workflow_config(self) -> AppConfig:
         if self.showdown is not None and self.kometa.config_path is None:
             raise ValueError("showdown requires kometa.config_path")
+        if (self.dated is not None or self.tagged.tag) and self.username is None:
+            raise ValueError("username is required for dated or tagged workflows")
+        needs_default_destination = bool(self.tagged.tag or self.random.collections)
+        if (
+            self.dated is None
+            and needs_default_destination
+            and self.random.kometa_destination is None
+        ):
+            raise ValueError(
+                "tagged/random workflows require dated.kometa_destination "
+                "or random.kometa_destination"
+            )
         return self
 
 

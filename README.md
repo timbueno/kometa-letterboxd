@@ -4,21 +4,29 @@ Generate Kometa collections from Letterboxd lists, Showdowns, and dated collecti
 
 ## Installation
 
-Install as a Python tool:
+Create a project-local virtual environment and install the package into it:
 
 ```bash
 git clone https://github.com/brege/kometa-letterboxd
 cd kometa-letterboxd
-uv tool install .
+python3.12 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
 ```
 
 ## Usage
 
 ```bash
-kometa-letterboxd --config config.yml
+.venv/bin/kometa-letterboxd --config config.yml
 ```
 
 See `config.example.yml` for configuration options.
+
+Run tests from the same virtual environment:
+
+```bash
+.venv/bin/python -m unittest discover -s tests
+```
 
 ## Background
 
@@ -32,9 +40,36 @@ This project interfaces Plex with Letterboxd through scripting *around* Kometa. 
 
 - [Tagged](/lists/tagged.py): if you tag collections with "plex" on Letterboxd, this builder will create Kometa collections from these collections. These are handpicked films that are easier to pick and tease out of Letterboxd than anywhere else, especially compared to Plex.
 
+- [Random](/kometa_letterboxd/collectors/user/random.py): builds a stable random subset from a large Letterboxd list. The subset rotates by schedule, currently monthly, but repeated runs in the same month produce the same movies.
+
 - [Showdown](/lists/showdown.py): this is a sophisticated method. [Letterboxd Showdowns](https://letterboxd.com/showdown/) is a page of over 250 lists, each of which are constructed by a [motif](https://en.wikipedia.org/wiki/Motif_(narrative)) such as "Brief Encounter" or "Sense and Sensibility" that don't narrowly fit into a genre (War) or theme (political and human rights).
 
 Importing a whole Showdown page, which Kometa can do, is problematic. These pages contain a lot of movies from users that definitely do not fit the motif. Letterboxd staff cuts the aggregate list down to the 20 best represented movies for that motif.
+
+### Random Collections
+
+Random collections are useful when a Letterboxd list is too large to import as a single Plex collection. Configure a source list, a target count, a seed namespace, and a monthly period:
+
+```yaml
+random:
+  collections:
+    - name: "🌊 Random from TNMN"
+      url: "https://letterboxd.com/tn_movienight/list/tuesday-night-movie-night-recommendations/"
+      count: 10
+      seed: "tnmn"
+      period: "monthly"
+      sync_mode: "sync"
+      collection_order: "custom"
+      radarr_add_missing: true
+      radarr_folder: "/media/ephemeral-movies"
+      radarr_tag:
+        - "ephemeral"
+        - "tnmn-random"
+```
+
+The selector resolves movies from the complete source list, deduplicates them by stable identifier, and ranks them with a SHA-256 key derived from `<seed>-<YYYY-MM>` and the movie ID. For example, `tnmn-2026-06` produces the same ten movies for every run in June 2026, while `tnmn-2026-07` produces a different monthly subset. Reordering the source list does not change the selection when the underlying movie IDs are unchanged.
+
+Random collections are emitted with direct `tmdb_movie` IDs when Letterboxd exposes the TMDb ID on each film page. If `count` is larger than the source list size, the collection uses all resolved movies.
 
 ### Showdowns in Plex
 

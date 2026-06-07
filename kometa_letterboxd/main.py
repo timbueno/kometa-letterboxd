@@ -11,6 +11,7 @@ from kometa_letterboxd.collectors.user.dated import (
     get_dated_lists,
 )
 from kometa_letterboxd.collectors.user.lists import ensure_user_lists
+from kometa_letterboxd.collectors.user.random import generate_random_collections
 from kometa_letterboxd.collectors.user.tagged import (
     generate_tagged_collections,
     get_lists_with_tag,
@@ -82,41 +83,58 @@ def main():
         raise SystemExit(str(exc)) from exc
 
     data_dir = args.data or os.environ.get("LETTERBOXD_HELPER_DATA") or "data"
-    lists_cache_path = config.lists_cache or f"{data_dir}/user/dated.json"
     kometa_config_path = resolve_path(config.kometa.config_path, config_path.parent)
-    kometa_destination = resolve_required_path(
-        config.dated.kometa_destination,
-        config_path.parent,
+    kometa_destination_raw = (
+        config.dated.kometa_destination
+        if config.dated is not None
+        else config.random.kometa_destination
+    )
+    kometa_destination = (
+        resolve_required_path(kometa_destination_raw, config_path.parent)
+        if kometa_destination_raw is not None
+        else None
     )
 
     print("Starting Letterboxd list fetcher...")
 
-    default_destination = ensure_kometa_file(kometa_destination)
-    all_user_lists = ensure_user_lists(
-        config.username,
-        cache_path=lists_cache_path,
-        timeout=config.request_timeout,
-        refresh=config.refresh_lists,
-        days_before=config.dated.days_before,
+    default_destination = (
+        ensure_kometa_file(kometa_destination)
+        if kometa_destination is not None
+        else None
     )
+    all_user_lists = []
+    needs_user_lists = config.dated is not None or bool(config.tagged.tag)
+    if needs_user_lists:
+        if config.username is None:
+            raise ValueError("username is required for dated or tagged workflows")
+        lists_cache_path = config.lists_cache or f"{data_dir}/user/dated.json"
+        days_before = config.dated.days_before if config.dated is not None else 0
+        all_user_lists = ensure_user_lists(
+            config.username,
+            cache_path=lists_cache_path,
+            timeout=config.request_timeout,
+            refresh=config.refresh_lists,
+            days_before=days_before,
+        )
 
     all_collections = {}
 
-    dated_lists = get_dated_lists(
-        all_user_lists,
-        config.dated.letterboxd_prefix,
-        config.dated.days_before,
-    )
-    if dated_lists:
-        dated_collections = generate_dated_collections(
-            dated_lists,
+    if config.dated is not None:
+        dated_lists = get_dated_lists(
+            all_user_lists,
             config.dated.letterboxd_prefix,
-            config.dated.plex_prefix,
             config.dated.days_before,
-            entry_extra=config.dated.collection_extra,
-            extended_extra=config.dated.extended_extra,
         )
-        all_collections.update(dated_collections)
+        if dated_lists:
+            dated_collections = generate_dated_collections(
+                dated_lists,
+                config.dated.letterboxd_prefix,
+                config.dated.plex_prefix,
+                config.dated.days_before,
+                entry_extra=config.dated.collection_extra,
+                extended_extra=config.dated.extended_extra,
+            )
+            all_collections.update(dated_collections)
 
     tagged_lists = get_lists_with_tag(all_user_lists, config.tagged.tag)
     if tagged_lists:
@@ -125,6 +143,13 @@ def main():
             extra=config.tagged.extra,
         )
         all_collections.update(tagged_collections)
+
+    random_collections = generate_random_collections(
+        config.random,
+        timeout=config.request_timeout,
+    )
+    if random_collections:
+        all_collections.update(random_collections)
 
     showdown_delete: list[str] = []
 
@@ -140,6 +165,11 @@ def main():
     showdown_retired = list(dict.fromkeys(showdown_retired))
     if showdown_collections:
         target_path = showdown_destination or default_destination
+        if target_path is None:
+            raise ValueError(
+                "showdown requires dated.kometa_destination, "
+                "random.kometa_destination, or showdown.kometa_destination"
+            )
         if target_path == default_destination:
             all_collections.update(showdown_collections)
             showdown_delete = showdown_retired
@@ -159,14 +189,18 @@ def main():
     if showdown_delete:
         delete_collections_named.extend(showdown_delete)
 
-    write_collections_section(
-        default_destination,
-        all_collections,
-        generator=Path(__file__).name,
-        config_source=config_path,
-        delete_collections_named=delete_collections_named or None,
-    )
-    print(f"\nKometa config file {kometa_destination} has been updated successfully.")
+    if default_destination is not None:
+        write_collections_section(
+            default_destination,
+            all_collections,
+            generator=Path(__file__).name,
+            config_source=config_path,
+            delete_collections_named=delete_collections_named or None,
+        )
+        print(
+            f"\nKometa config file {kometa_destination} "
+            "has been updated successfully."
+        )
 
 
 if __name__ == "__main__":
