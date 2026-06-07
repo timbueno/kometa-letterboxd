@@ -24,8 +24,9 @@ tagged:
     label.not: "Film Club"
 
 random:
+  namespace_emoji: "🔀"
   collections:
-    - name: "🌊 Random from TNMN"
+    - name: "Random from TNMN"
       url: "https://letterboxd.com/tn_movienight/list/tuesday-night-movie-night-recommendations/"
       count: 10
       seed: "tnmn"
@@ -40,6 +41,7 @@ random:
         - "tnmn-random"
 
 showdown_latest:
+  namespace_emoji: "🥊"
   count: 2
   entries: 5
   sync_mode: sync

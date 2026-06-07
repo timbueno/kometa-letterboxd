@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 
 from kometa_letterboxd.common.config import RandomConfig
 from kometa_letterboxd.common.kometa import build_collection_entry
+from kometa_letterboxd.common.names import prepend_namespace_emoji
 
 from .lists import LETTERBOXD_BASE, to_letterboxd_url
 
@@ -80,9 +81,15 @@ def generate_random_collections(
 
     for collection_config in random_config.collections:
         period_key = period_key_for(today, collection_config.period)
+        collection_name = prepend_namespace_emoji(
+            collection_config.name,
+            collection_config.namespace_emoji
+            if collection_config.namespace_emoji is not None
+            else random_config.namespace_emoji,
+        )
         progress(
             "\nPreparing random collection "
-            f"'{collection_config.name}' for {period_key}..."
+            f"'{collection_name}' for {period_key}..."
         )
         source_movies = fetch_letterboxd_list_movies(
             collection_config.url,
@@ -116,13 +123,13 @@ def generate_random_collections(
         collection_order = _resolve_collection_order(
             collection_config.collection_order,
             builder_item_count=len(tmdb_ids),
-            collection_name=collection_config.name,
+            collection_name=collection_name,
             progress=progress,
         )
 
-        collections[collection_config.name] = build_collection_entry(
+        collections[collection_name] = build_collection_entry(
             collection_config.url,
-            sort_title=collection_config.name,
+            sort_title=collection_name,
             sync_mode=collection_config.sync_mode,
             collection_order=collection_order,
             extra=collection_config.kometa_extra(),

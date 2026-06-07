@@ -19,6 +19,7 @@ Showdown behavior must remain unchanged.
 
 ```yaml
 showdown_latest:
+  namespace_emoji: "🥊"
   count: 2
   entries: 5
   sync_mode: sync
@@ -81,6 +82,10 @@ file_poster: "/config/assets/showdowns/poster.png"
 label: "Letterboxd Showdown"
 ```
 
+`namespace_emoji`
+: Optional emoji prepended to generated collection names. If the generated name
+  already starts with the same emoji, it is not duplicated.
+
 ## Selection Behavior
 
 1. Fetch the Letterboxd Showdowns index.
@@ -103,11 +108,12 @@ Use the Showdown title plus its index logline/subheadline.
 Example:
 
 ```text
-Short 'n' Sweet: Best adaptation of short to feature
+🥊 Short 'n' Sweet: Best adaptation of short to feature
 ```
 
 Do not prefix the display name with `Showdown:` unless the source title/logline
-is unavailable.
+is unavailable. If `namespace_emoji` is configured, prepend it to the display
+name.
 
 If the logline is missing, use only the Showdown title.
 

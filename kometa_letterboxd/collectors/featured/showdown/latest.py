@@ -11,6 +11,7 @@ from requests import Session
 
 from kometa_letterboxd.common.config import ShowdownLatestConfig, resolve_path
 from kometa_letterboxd.common.kometa import build_collection_entry
+from kometa_letterboxd.common.names import prepend_namespace_emoji
 
 from .probe import (
     DEFAULT_HEADERS,
@@ -77,7 +78,10 @@ def generate_latest_showdown_collections(
                 session=ses,
                 progress=progress,
             )
-            collection_name = format_showdown_collection_name(dataset.summary)
+            collection_name = prepend_namespace_emoji(
+                format_showdown_collection_name(dataset.summary),
+                showdown_config.namespace_emoji,
+            )
             collection_order = resolve_collection_order(
                 showdown_config.collection_order,
                 builder_item_count=len(_tmdb_ids(dataset.entries)),

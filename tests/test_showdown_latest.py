@@ -101,6 +101,56 @@ class ShowdownLatestSelectionTests(unittest.TestCase):
             "Short 'n' Sweet: Best adaptation of short to feature",
         )
 
+    def test_collection_name_can_be_prefixed_with_namespace_emoji(self) -> None:
+        config = ShowdownLatestConfig.model_validate(
+            {
+                "count": 1,
+                "entries": 1,
+                "namespace_emoji": "🥊",
+                "kometa_destination": "/tmp/showdowns.yml",
+            }
+        )
+
+        def fake_fetch(url, **_kwargs):
+            if url == "https://letterboxd.com/showdown/":
+                return INDEX_HTML
+            if url.endswith("/showdown/short-n-sweet/"):
+                return DESCRIPTION_HTML
+            if url.endswith("/crew/list/showdown-short-n-sweet/"):
+                return crew_html("short")
+            raise AssertionError(f"Unexpected URL: {url}")
+
+        def populate_tmdb_ids(datasets, **_kwargs) -> None:
+            for dataset in datasets:
+                for entry in dataset.entries:
+                    entry.tmdb_id = f"{dataset.summary.slug}-{entry.rank}"
+
+        with (
+            patch(
+                "kometa_letterboxd.collectors.featured.showdown.latest.fetch_html",
+                side_effect=fake_fetch,
+            ),
+            patch(
+                "kometa_letterboxd.collectors.featured.showdown.latest."
+                "populate_showdown_tmdb_ids",
+                side_effect=populate_tmdb_ids,
+            ),
+        ):
+            collections, _destination = generate_latest_showdown_collections(
+                config,
+                base_path=Path("/base"),
+                progress=lambda _message: None,
+            )
+
+        collection_name = (
+            "🥊 Short 'n' Sweet: Best adaptation of short to feature"
+        )
+        self.assertIn(collection_name, collections)
+        self.assertEqual(
+            collections[collection_name]["sort_title"],
+            f"Showdown Latest 01 {collection_name}",
+        )
+
 
 class ShowdownLatestCollectionTests(unittest.TestCase):
     def test_showdown_description_preserves_spaces_around_links(self) -> None:

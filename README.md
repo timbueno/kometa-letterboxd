@@ -61,8 +61,9 @@ Random collections are useful when a Letterboxd list is too large to import as a
 
 ```yaml
 random:
+  namespace_emoji: "🔀"
   collections:
-    - name: "🌊 Random from TNMN"
+    - name: "Random from TNMN"
       url: "https://letterboxd.com/tn_movienight/list/tuesday-night-movie-night-recommendations/"
       count: 10
       seed: "tnmn"
@@ -76,6 +77,11 @@ random:
         - "ephemeral"
         - "tnmn-random"
 ```
+
+`namespace_emoji` is optional. When set, it is prepended to generated collection
+names, for example `🔀 Random from TNMN`. You can also set `namespace_emoji` on
+an individual random collection to override the workflow default. If the name
+already starts with the same emoji, it is not duplicated.
 
 The selector resolves movies from the complete source list, deduplicates them by stable identifier, and ranks them with a SHA-256 key derived from `<seed>-<YYYY-MM>` and the movie ID. For example, `tnmn-2026-06` produces the same ten movies for every run in June 2026, while `tnmn-2026-07` produces a different monthly subset. Reordering the source list does not change the selection when the underlying movie IDs are unchanged.
 
@@ -93,6 +99,7 @@ Latest Showdowns generates collections from the latest completed Letterboxd Show
 
 ```yaml
 showdown_latest:
+  namespace_emoji: "🥊"
   count: 2
   entries: 5
   sync_mode: sync
@@ -114,7 +121,10 @@ showdown_latest:
     background: true
 ```
 
-Each collection uses the Showdown title plus logline, for example `Short 'n' Sweet: Best adaptation of short to feature`, includes the Showdown description as the Plex collection summary, and emits direct `tmdb_movie` IDs for the top `entries` movies.
+Each collection uses the Showdown title plus logline, for example `🥊 Short 'n'
+Sweet: Best adaptation of short to feature`, includes the Showdown description
+as the Plex collection summary, and emits direct `tmdb_movie` IDs for the top
+`entries` movies.
 
 The optional `poster` block generates a poster image for each latest Showdown
 collection and emits `file_poster` in the Kometa YAML. By default it also saves

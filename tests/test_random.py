@@ -150,6 +150,94 @@ class RandomSelectionTests(unittest.TestCase):
         self.assertEqual(entry["radarr_folder"], "/media/ephemeral-movies")
         self.assertEqual(entry["radarr_tag"], ["ephemeral", "tnmn-random"])
 
+    def test_random_collection_prepends_global_namespace_emoji(self) -> None:
+        config = RandomConfig.model_validate(
+            {
+                "namespace_emoji": "🔀",
+                "collections": [
+                    {
+                        "name": "Random from TNMN",
+                        "url": "https://letterboxd.com/example/list/source/",
+                        "count": 3,
+                        "seed": "tnmn",
+                    }
+                ],
+            }
+        )
+
+        with patch(
+            "kometa_letterboxd.collectors.user.random.fetch_letterboxd_list_movies",
+            return_value=_movies(*range(1, 11)),
+        ):
+            collections = generate_random_collections(
+                config,
+                current_date=datetime.date(2026, 6, 7),
+                progress=lambda _message: None,
+            )
+
+        self.assertIn("🔀 Random from TNMN", collections)
+        self.assertEqual(
+            collections["🔀 Random from TNMN"]["sort_title"],
+            "🔀 Random from TNMN",
+        )
+
+    def test_random_collection_namespace_emoji_can_be_overridden(self) -> None:
+        config = RandomConfig.model_validate(
+            {
+                "namespace_emoji": "🔀",
+                "collections": [
+                    {
+                        "name": "Random from TNMN",
+                        "namespace_emoji": "🌊",
+                        "url": "https://letterboxd.com/example/list/source/",
+                        "count": 3,
+                        "seed": "tnmn",
+                    }
+                ],
+            }
+        )
+
+        with patch(
+            "kometa_letterboxd.collectors.user.random.fetch_letterboxd_list_movies",
+            return_value=_movies(*range(1, 11)),
+        ):
+            collections = generate_random_collections(
+                config,
+                current_date=datetime.date(2026, 6, 7),
+                progress=lambda _message: None,
+            )
+
+        self.assertIn("🌊 Random from TNMN", collections)
+        self.assertNotIn("🔀 Random from TNMN", collections)
+
+    def test_random_collection_does_not_duplicate_namespace_emoji(self) -> None:
+        config = RandomConfig.model_validate(
+            {
+                "namespace_emoji": "🔀",
+                "collections": [
+                    {
+                        "name": "🔀 Random from TNMN",
+                        "url": "https://letterboxd.com/example/list/source/",
+                        "count": 3,
+                        "seed": "tnmn",
+                    }
+                ],
+            }
+        )
+
+        with patch(
+            "kometa_letterboxd.collectors.user.random.fetch_letterboxd_list_movies",
+            return_value=_movies(*range(1, 11)),
+        ):
+            collections = generate_random_collections(
+                config,
+                current_date=datetime.date(2026, 6, 7),
+                progress=lambda _message: None,
+            )
+
+        self.assertIn("🔀 Random from TNMN", collections)
+        self.assertNotIn("🔀 🔀 Random from TNMN", collections)
+
     def test_random_collection_can_disable_radarr_search(self) -> None:
         config = RandomConfig.model_validate(
             {

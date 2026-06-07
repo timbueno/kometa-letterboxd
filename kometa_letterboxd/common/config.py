@@ -78,6 +78,7 @@ class ShowdownPosterConfig(BaseModel):
 class ShowdownLatestConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
+    namespace_emoji: str | None = None
     count: int = Field(default=2, ge=1)
     entries: int = Field(default=5, ge=1)
     sync_mode: str = "sync"
@@ -118,6 +119,7 @@ class RandomCollectionConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     name: NonEmptyStr
+    namespace_emoji: str | None = None
     url: NonEmptyStr
     count: int = Field(ge=0)
     seed: NonEmptyStr
@@ -157,6 +159,7 @@ class RandomCollectionConfig(BaseModel):
 class RandomConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
+    namespace_emoji: str | None = None
     collections: list[RandomCollectionConfig] = Field(default_factory=list)
     kometa_destination: NonEmptyStr | None = None
 
