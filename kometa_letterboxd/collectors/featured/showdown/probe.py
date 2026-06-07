@@ -153,11 +153,26 @@ def parse_showdown_description(html: str) -> str | None:
     # Look for the description in the body-text -prose element
     desc_elem = soup.select_one(".body-text.-prose")
     if desc_elem:
-        text = desc_elem.get_text(strip=True)
+        paragraphs = desc_elem.find_all("p")
+        if paragraphs:
+            text = "\n\n".join(
+                _normalize_description_text(paragraph.get_text(" ", strip=True))
+                for paragraph in paragraphs
+            )
+        else:
+            text = _normalize_description_text(desc_elem.get_text(" ", strip=True))
         if text and len(text) > 10:  # Basic sanity check
             return text
 
     return None
+
+
+def _normalize_description_text(text: str) -> str:
+    text = re.sub(r"[ \t]+", " ", text).strip()
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    text = re.sub(r"\s+([—–])", r"\1", text)
+    text = re.sub(r"([([{])\s+", r"\1", text)
+    return text
 
 
 def parse_showdown_background_image(html: str) -> str | None:

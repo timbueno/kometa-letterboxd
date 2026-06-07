@@ -17,6 +17,7 @@ from kometa_letterboxd.collectors.featured.showdown.probe import (
     ShowdownDataset,
     ShowdownEntry,
     ShowdownSummary,
+    parse_showdown_description,
 )
 from kometa_letterboxd.common.config import ShowdownLatestConfig, load_config
 
@@ -97,6 +98,24 @@ class ShowdownLatestSelectionTests(unittest.TestCase):
 
 
 class ShowdownLatestCollectionTests(unittest.TestCase):
+    def test_showdown_description_preserves_spaces_around_links(self) -> None:
+        html = """
+<div class="body-text -prose">
+  <p>With <a>Backrooms</a>—the eerie new horror—now haunting cinemas.</p>
+  <p>Check out these lists by <a>Imani</a>, <a>Frodobatmanvadr</a> and
+     <a>Short of the Week</a> for inspiration.</p>
+</div>
+"""
+
+        description = parse_showdown_description(html)
+
+        self.assertEqual(
+            description,
+            "With Backrooms—the eerie new horror—now haunting cinemas.\n\n"
+            "Check out these lists by Imani, Frodobatmanvadr and "
+            "Short of the Week for inspiration.",
+        )
+
     def test_collection_includes_description_and_extra_kometa_fields(self) -> None:
         config = ShowdownLatestConfig.model_validate(
             {
