@@ -96,6 +96,12 @@ def generate_random_collections(
             seed=collection_config.seed,
             period_key=period_key,
         )
+        _populate_tmdb_ids(
+            selected_movies,
+            timeout=timeout,
+            session=session,
+            progress=progress,
+        )
         tmdb_ids = [
             str(movie.tmdb_id)
             for movie in selected_movies
@@ -159,9 +165,7 @@ def fetch_letterboxd_list_movies(
 
             page += 1
 
-        movies = list(movies_by_url.values())
-        _populate_tmdb_ids(movies, session=ses, timeout=timeout, progress=progress)
-        return movies
+        return list(movies_by_url.values())
     finally:
         if owns_session:
             ses.close()
@@ -222,31 +226,40 @@ def _first_attribute(element, *names: str) -> str:
 def _populate_tmdb_ids(
     movies: list[RandomMovie],
     *,
-    session: requests.Session,
     timeout: int,
+    session: requests.Session | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> None:
-    for index, movie in enumerate(movies):
-        if movie.tmdb_id:
-            continue
-        try:
-            response = session.get(movie.film_url, timeout=timeout)
-            response.raise_for_status()
-            tmdb_id = _extract_tmdb_id_from_film_page(response.text)
-        except requests.RequestException as exc:
-            if progress:
-                progress(f"  ! Failed to fetch TMDB id for {movie.film_url}: {exc}")
-            tmdb_id = None
+    owns_session = session is None
+    ses = session or cloudscraper.create_scraper()
 
-        if not tmdb_id:
-            continue
+    try:
+        for index, movie in enumerate(movies):
+            if movie.tmdb_id:
+                continue
+            try:
+                response = ses.get(movie.film_url, timeout=timeout)
+                response.raise_for_status()
+                tmdb_id = _extract_tmdb_id_from_film_page(response.text)
+            except requests.RequestException as exc:
+                if progress:
+                    progress(
+                        f"  ! Failed to fetch TMDB id for {movie.film_url}: {exc}"
+                    )
+                tmdb_id = None
 
-        movies[index] = RandomMovie(
-            title=movie.title,
-            film_url=movie.film_url,
-            film_slug=movie.film_slug,
-            tmdb_id=tmdb_id,
-        )
+            if not tmdb_id:
+                continue
+
+            movies[index] = RandomMovie(
+                title=movie.title,
+                film_url=movie.film_url,
+                film_slug=movie.film_slug,
+                tmdb_id=tmdb_id,
+            )
+    finally:
+        if owns_session:
+            ses.close()
 
 
 def _extract_tmdb_id_from_film_page(html: str) -> str | None:

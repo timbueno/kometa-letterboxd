@@ -69,7 +69,7 @@ random:
 
 The selector resolves movies from the complete source list, deduplicates them by stable identifier, and ranks them with a SHA-256 key derived from `<seed>-<YYYY-MM>` and the movie ID. For example, `tnmn-2026-06` produces the same ten movies for every run in June 2026, while `tnmn-2026-07` produces a different monthly subset. Reordering the source list does not change the selection when the underlying movie IDs are unchanged.
 
-Random collections are emitted with direct `tmdb_movie` IDs when Letterboxd exposes the TMDb ID on each film page. If `count` is larger than the source list size, the collection uses all resolved movies.
+Random collections are emitted with direct `tmdb_movie` IDs when Letterboxd exposes the TMDb ID on each selected film page. The script fetches the complete list pages to build the pool, samples by stable Letterboxd movie identifiers, and then resolves TMDb IDs only for the selected subset. If `count` is larger than the source list size, the collection uses all resolved movies.
 
 ### Showdowns in Plex
 

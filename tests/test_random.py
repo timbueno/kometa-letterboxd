@@ -26,6 +26,17 @@ def _movies(*tmdb_ids: int) -> list[RandomMovie]:
     ]
 
 
+def _unresolved_movies(*movie_ids: int) -> list[RandomMovie]:
+    return [
+        RandomMovie(
+            title=f"Movie {movie_id}",
+            film_url=f"https://letterboxd.com/film/movie-{movie_id}/",
+            film_slug=f"movie-{movie_id}",
+        )
+        for movie_id in movie_ids
+    ]
+
+
 def _stable_ids(movies: list[RandomMovie]) -> list[str]:
     return [movie.stable_id for movie in movies]
 
@@ -136,6 +147,53 @@ class RandomSelectionTests(unittest.TestCase):
         self.assertEqual(entry["radarr_add_missing"], True)
         self.assertEqual(entry["radarr_folder"], "/media/ephemeral-movies")
         self.assertEqual(entry["radarr_tag"], ["ephemeral", "tnmn-random"])
+
+    def test_random_collection_resolves_tmdb_ids_only_after_sampling(self) -> None:
+        config = RandomConfig.model_validate(
+            {
+                "collections": [
+                    {
+                        "name": "Random from TNMN",
+                        "url": "https://letterboxd.com/example/list/source/",
+                        "count": 3,
+                        "seed": "tnmn",
+                    }
+                ]
+            }
+        )
+        resolver_lengths: list[int] = []
+
+        def populate_selected(movies, **_kwargs) -> None:
+            resolver_lengths.append(len(movies))
+            for index, movie in enumerate(movies):
+                movies[index] = RandomMovie(
+                    title=movie.title,
+                    film_url=movie.film_url,
+                    film_slug=movie.film_slug,
+                    tmdb_id=str(index + 100),
+                )
+
+        with (
+            patch(
+                "kometa_letterboxd.collectors.user.random.fetch_letterboxd_list_movies",
+                return_value=_unresolved_movies(*range(1, 401)),
+            ),
+            patch(
+                "kometa_letterboxd.collectors.user.random._populate_tmdb_ids",
+                side_effect=populate_selected,
+            ),
+        ):
+            collections = generate_random_collections(
+                config,
+                current_date=datetime.date(2026, 6, 7),
+                progress=lambda _message: None,
+            )
+
+        self.assertEqual(resolver_lengths, [3])
+        self.assertEqual(
+            collections["Random from TNMN"]["tmdb_movie"],
+            ["100", "101", "102"],
+        )
 
 
 class ConfigCompatibilityTests(unittest.TestCase):
