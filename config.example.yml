@@ -39,6 +39,21 @@ random:
         - "ephemeral"
         - "tnmn-random"
 
+showdown_latest:
+  count: 2
+  entries: 5
+  sync_mode: sync
+  show_missing: true
+  radarr_add_missing: true
+  radarr_search: true
+  radarr_folder: "/mnt/ephemeral-movies"
+  radarr_tag:
+    - "ephemeral"
+    - "showdown"
+  visible_library: true
+  visible_home: true
+  visible_shared: false
+
 showdown:
   showdown_json: path/to/showdown.json
   cache_path: path/to/showdown-cache.json

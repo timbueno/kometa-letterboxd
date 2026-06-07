@@ -6,6 +6,9 @@ import yaml
 from pydantic import ValidationError
 
 from kometa_letterboxd.collectors.featured.showdown import generate_showdown_collections
+from kometa_letterboxd.collectors.featured.showdown.latest import (
+    generate_latest_showdown_collections,
+)
 from kometa_letterboxd.collectors.user.dated import (
     generate_dated_collections,
     get_dated_lists,
@@ -87,7 +90,14 @@ def main():
     kometa_destination_raw = (
         config.dated.kometa_destination
         if config.dated is not None
-        else config.random.kometa_destination
+        else (
+            config.random.kometa_destination
+            or (
+                config.showdown_latest.kometa_destination
+                if config.showdown_latest is not None
+                else None
+            )
+        )
     )
     kometa_destination = (
         resolve_required_path(kometa_destination_raw, config_path.parent)
@@ -150,6 +160,32 @@ def main():
     )
     if random_collections:
         all_collections.update(random_collections)
+
+    latest_showdown_collections, latest_showdown_destination = (
+        generate_latest_showdown_collections(
+            config.showdown_latest,
+            base_path=config_path.parent,
+            timeout=config.request_timeout,
+        )
+    )
+    if latest_showdown_collections:
+        target_path = latest_showdown_destination or default_destination
+        if target_path is None:
+            raise ValueError(
+                "showdown_latest requires dated.kometa_destination, "
+                "random.kometa_destination, or showdown_latest.kometa_destination"
+            )
+        if target_path == default_destination:
+            all_collections.update(latest_showdown_collections)
+        else:
+            ensured_target = ensure_kometa_file(target_path)
+            write_collections_section(
+                ensured_target,
+                latest_showdown_collections,
+                generator=f"{Path(__file__).name} showdown_latest",
+                config_source=config_path,
+            )
+            print(f"Latest Showdown collections written to {ensured_target}")
 
     showdown_delete: list[str] = []
 

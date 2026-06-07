@@ -58,6 +58,44 @@ class ShowdownConfig(BaseModel):
     kometa_destination: NonEmptyStr | None = None
 
 
+class ShowdownLatestConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    count: int = Field(default=2, ge=1)
+    entries: int = Field(default=5, ge=1)
+    sync_mode: str = "sync"
+    collection_order: str | None = None
+    show_missing: bool | None = True
+    radarr_add_missing: bool | None = None
+    radarr_folder: NonEmptyStr | None = None
+    radarr_tag: NonEmptyStr | list[NonEmptyStr] | None = None
+    radarr_search: bool | None = None
+    kometa_destination: NonEmptyStr | None = None
+    extra: dict[str, object] = Field(default_factory=dict)
+
+    def kometa_extra(self) -> dict[str, object]:
+        direct_fields = {
+            "radarr_add_missing": self.radarr_add_missing,
+            "radarr_folder": self.radarr_folder,
+            "radarr_tag": self.radarr_tag,
+            "radarr_search": self.radarr_search,
+            "show_missing": self.show_missing,
+        }
+        if self.radarr_add_missing is True and self.radarr_search is None:
+            direct_fields["radarr_search"] = True
+        payload = {
+            key: value for key, value in direct_fields.items() if value is not None
+        }
+        payload.update(self.extra)
+
+        if self.model_extra:
+            for key, value in self.model_extra.items():
+                if value is not None:
+                    payload[key] = value
+
+        return payload
+
+
 class RandomCollectionConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -116,6 +154,7 @@ class AppConfig(BaseModel):
     dated: DatedConfig | None = None
     tagged: TaggedConfig = Field(default_factory=TaggedConfig)
     showdown: ShowdownConfig | None = None
+    showdown_latest: ShowdownLatestConfig | None = None
     random: RandomConfig = Field(default_factory=RandomConfig)
 
     @model_validator(mode="after")
@@ -124,15 +163,22 @@ class AppConfig(BaseModel):
             raise ValueError("showdown requires kometa.config_path")
         if (self.dated is not None or self.tagged.tag) and self.username is None:
             raise ValueError("username is required for dated or tagged workflows")
-        needs_default_destination = bool(self.tagged.tag or self.random.collections)
+        needs_default_destination = bool(
+            self.tagged.tag or self.random.collections or self.showdown_latest
+        )
         if (
             self.dated is None
             and needs_default_destination
             and self.random.kometa_destination is None
+            and (
+                self.showdown_latest is None
+                or self.showdown_latest.kometa_destination is None
+            )
         ):
             raise ValueError(
-                "tagged/random workflows require dated.kometa_destination "
-                "or random.kometa_destination"
+                "tagged/random/showdown_latest workflows require "
+                "dated.kometa_destination, random.kometa_destination, "
+                "or showdown_latest.kometa_destination"
             )
         return self
 

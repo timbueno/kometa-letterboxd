@@ -42,6 +42,8 @@ This project interfaces Plex with Letterboxd through scripting *around* Kometa. 
 
 - [Random](/kometa_letterboxd/collectors/user/random.py): builds a stable random subset from a large Letterboxd list. The subset rotates by schedule, currently monthly, but repeated runs in the same month produce the same movies.
 
+- [Latest Showdowns](/kometa_letterboxd/collectors/featured/showdown/latest.py): builds Radarr-backed collections from the latest completed Letterboxd Showdowns, using only the top ranked movies from each Showdown.
+
 - [Showdown](/lists/showdown.py): this is a sophisticated method. [Letterboxd Showdowns](https://letterboxd.com/showdown/) is a page of over 250 lists, each of which are constructed by a [motif](https://en.wikipedia.org/wiki/Motif_(narrative)) such as "Brief Encounter" or "Sense and Sensibility" that don't narrowly fit into a genre (War) or theme (political and human rights).
 
 Importing a whole Showdown page, which Kometa can do, is problematic. These pages contain a lot of movies from users that definitely do not fit the motif. Letterboxd staff cuts the aggregate list down to the 20 best represented movies for that motif.
@@ -77,6 +79,29 @@ Random collections omit `collection_order` by default. Kometa allows `collection
 Random collections emit `show_missing: true` by default so Kometa logs which selected titles are not yet in Plex. Set `show_missing: false` on a collection if you want quieter logs.
 
 When `radarr_add_missing: true` is set, Random collections also emit `radarr_search: true` by default so Radarr starts a search after Kometa adds missing movies. Set `radarr_search: false` if you only want Radarr to add and monitor them.
+
+### Latest Showdowns
+
+Latest Showdowns generates collections from the latest completed Letterboxd Showdowns and skips the current in-progress Showdown. With `count: 2`, the two latest completed Showdowns remain configured, which is roughly one month of retention at Letterboxd's usual two-week cadence.
+
+```yaml
+showdown_latest:
+  count: 2
+  entries: 5
+  sync_mode: sync
+  show_missing: true
+  radarr_add_missing: true
+  radarr_search: true
+  radarr_folder: "/mnt/ephemeral-movies"
+  radarr_tag:
+    - ephemeral
+    - showdown
+  visible_library: true
+  visible_home: true
+  visible_shared: false
+```
+
+Each collection uses the Showdown title plus logline, for example `Short 'n' Sweet: Best adaptation of short to feature`, includes the Showdown description as the Plex collection summary, and emits direct `tmdb_movie` IDs for the top `entries` movies.
 
 ### Showdowns in Plex
 
